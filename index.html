@@ -79,6 +79,16 @@
     .chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
     .chart-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
+    /* ── Drill-down panel ── */
+    .drill-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .drill-close {
+      border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+      font-family: 'DM Sans', sans-serif; font-size: 11px; padding: 3px 10px;
+      border-radius: var(--radius-sm); cursor: pointer;
+    }
+    .drill-close:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+    #funnel-chart { cursor: pointer; }
+
     /* ── Empty / placeholder state ── */
     .empty-state { text-align: center; color: var(--text-muted); font-size: 13px; padding: 60px 20px; line-height: 1.7; }
     .empty-state .es-big { font-size: 15px; color: var(--text-dim); font-weight: 500; margin-bottom: 8px; }
@@ -413,6 +423,17 @@
       </div>
     </section>
 
+    <!-- S2b: Deal drill-down -->
+    <section id="drill-section" class="hidden">
+      <div class="drill-head">
+        <span class="sec-title" id="drill-title"></span>
+        <button class="drill-close" onclick="closeDrillPanel()">✕ Close</button>
+      </div>
+      <div class="card">
+        <div class="dt-scroll" id="drill-table"></div>
+      </div>
+    </section>
+
     <!-- S3: Pending & Absagen -->
     <section>
       <div class="sec-title">Pending &amp; Absagen</div>
@@ -567,6 +588,8 @@ const state = {
   perfSort: { key: 'spend', dir: -1 },
 };
 let funnelChart = null;
+let funnelCamps = []; // campaign key order for stacked chart drill-down
+const fmtDate = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '—';
 let trendChart  = null;
 let adsChart    = null;
 let perfChart   = null;
@@ -598,6 +621,8 @@ function detectCols(fields) {
     handover:    has('Handover')               ? 'Handover'               : long('Date entered "Handover Installation (B2C)"'),
     absage:      has('Absage')                 ? 'Absage'                 : long('Date entered "Absage (B2C)"'),
     utm:         'utm_campaign',
+    name:        fields.find(f => /deal.?name/i.test(f)) || null,
+    email:       fields.find(f => /e.?mail/i.test(f)) || null,
     absageGrund: 'Absage - Grund',
   };
 }
@@ -718,6 +743,8 @@ function parseDeals(rows, cols) {
       utm, campaign, paid, channel: paid ? 'paid' : 'organic',
       absageStage, pendingStage,
       absageGrund: r[cols.absageGrund] || '',
+      name:  (cols.name  && r[cols.name])  || '',
+      email: (cols.email && r[cols.email]) || '',
       month, week,
     };
   }).filter(Boolean);
@@ -851,10 +878,66 @@ const funnelTotalsLabel = {
   },
 };
 
+function dealsForStep(step, campaign) {
+  let d = filtered();
+  if (campaign) d = d.filter(x => x.campaign === campaign);
+  switch (step) {
+    case 'Neuer Lead':   return d;
+    case 'Qualifiziert': return d.filter(x => x.erst);
+    case 'Closing':      return d.filter(x => x.abschl);
+    case 'Closed Won':   return d.filter(x => x.won);
+    case 'Closed Lost':  return d.filter(x => x.lost);
+    default: return [];
+  }
+}
+
+function closeDrillPanel() {
+  document.getElementById('drill-section').classList.add('hidden');
+}
+
+function renderDrillPanel(step, campaign) {
+  const deals = dealsForStep(step, campaign);
+  const title = campaign ? `${step} — ${dn(campaign)} · ${deals.length} deals` : `${step} — ${deals.length} deals`;
+  document.getElementById('drill-title').textContent = title;
+  document.getElementById('drill-section').classList.remove('hidden');
+  document.getElementById('drill-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const sorted = [...deals].sort((a, b) => a.createDate - b.createDate);
+  const showAbsage = sorted.some(d => d.lost);
+
+  const rows = sorted.map(d => `
+    <tr>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name || ''}">${d.name || '<span class="dim">—</span>'}</td>
+      <td><span class="cdot" style="background:${colorFor(d.campaign)}"></span>${dn(d.campaign)}</td>
+      <td>${d.status === 'Closed Won' ? '<span style="color:#4ade80">Won</span>' : d.status === 'Closed Lost' ? '<span style="color:#f87171">Lost</span>' : '<span class="dim">In Process</span>'}</td>
+      <td>${fmtDate(d.createDate)}</td>
+      <td>${fmtDate(d.erstD)}</td>
+      <td>${fmtDate(d.abschlD)}</td>
+      <td>${fmtDate(d.signedD || d.handD)}</td>
+      ${showAbsage ? `<td>${fmtDate(d.absD)}</td><td>${d.absageGrund || '<span class="dim">—</span>'}</td>` : ''}
+    </tr>`).join('');
+
+  document.getElementById('drill-table').innerHTML = `
+    <table class="dt">
+      <thead><tr>
+        <th style="text-align:left">Name</th>
+        <th style="text-align:left">Campaign</th>
+        <th style="text-align:left">Status</th>
+        <th>Neuer Lead</th>
+        <th>Qualifiziert</th>
+        <th>Closing</th>
+        <th>Closed Won</th>
+        ${showAbsage ? '<th>Absage</th><th style="text-align:left">Absage Grund</th>' : ''}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function renderFunnel(deals) {
   const ctx   = document.getElementById('funnel-chart').getContext('2d');
   const legend = document.getElementById('funnel-legend');
   if (funnelChart) { funnelChart.destroy(); funnelChart = null; }
+  closeDrillPanel();
 
   const counts = funnelCount(deals);
   const opts   = baseChartOpts();
@@ -889,6 +972,10 @@ function renderFunnel(deals) {
         },
       },
     };
+    totalOpts.onClick = (event, elements) => {
+      if (!elements.length) return;
+      renderDrillPanel(FUNNEL_STEPS[elements[0].index], null);
+    };
     funnelChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -905,6 +992,7 @@ function renderFunnel(deals) {
     });
   } else {
     const camps = [...state.campaigns].filter(c => deals.some(d => d.campaign === c));
+    funnelCamps = camps;
     const datasets = camps.map(c => {
       const cd = deals.filter(d => d.campaign === c);
       return {
@@ -959,6 +1047,10 @@ function renderFunnel(deals) {
       },
     };
 
+    stackedOpts.onClick = (event, elements) => {
+      if (!elements.length) return;
+      renderDrillPanel(FUNNEL_STEPS[elements[0].index], funnelCamps[elements[0].datasetIndex]);
+    };
     funnelChart = new Chart(ctx, { type: 'bar', data: { labels: FUNNEL_STEPS, datasets }, options: stackedOpts, plugins: [funnelTotalsLabel] });
 
     legend.classList.remove('hidden');
