@@ -655,13 +655,13 @@ function parseDate(v) {
 // campaign names (which append suffixes), and auto-handles new codes (K4a, K8, …).
 function classifyCampaign(utm) {
   if (!utm || !utm.trim()) return 'Organic';
-  const t = utm.trim();
-  const m = t.match(/\bK\d+[a-z]?\b/i);          // K1a, K2, K4b, K8, …
-  if (m) return 'K' + m[0].slice(1).toLowerCase(); // normalise → K1a, K2, K4b, K8
+  const t = utm.trim().replace(/_/g, ' '); // underscores → spaces so \b works on K-codes
+  const m = t.match(/\bK\d+[a-z]?\b/i);
+  if (m) return 'K' + m[0].slice(1).toLowerCase();
   if (/freunde|bullfinch/i.test(t)) return 'Referral';
   return 'Other';
 }
-const isPaid = utm => !!(utm && /\bSearch\b/i.test(utm) && /\bK\d/i.test(utm));
+const isPaid = utm => !!(utm && /\bSearch\b/i.test(utm) && /\bK\d/i.test(utm.replace(/_/g, ' ')));
 
 // ─────────────────────────────────────────────
 // ISO week helpers
