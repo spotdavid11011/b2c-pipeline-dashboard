@@ -250,6 +250,73 @@
     }
     .reset-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
 
+    /* ── AI Analyze button ── */
+    .ai-btn {
+      background: transparent; border: 1px solid rgba(232,245,71,0.4); color: var(--accent);
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+      padding: 4px 12px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.12s; white-space: nowrap;
+    }
+    .ai-btn:hover { background: rgba(232,245,71,0.08); border-color: var(--accent); }
+    .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .ai-btn.loading { opacity: 0.7; }
+
+    /* ── AI key modal ── */
+    #ai-modal {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(14,15,17,0.88); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ai-modal-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 28px 32px; width: 420px; max-width: 90vw;
+    }
+    .ai-modal-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .ai-modal-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
+    .ai-modal-sub a { color: var(--accent); text-decoration: none; }
+    .ai-key-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 12px; padding: 8px 10px;
+      border-radius: var(--radius-sm); outline: none; margin-bottom: 14px;
+    }
+    .ai-key-input:focus { border-color: rgba(232,245,71,0.4); }
+    .ai-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .ai-modal-cancel {
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 14px;
+      border-radius: var(--radius-sm); cursor: pointer;
+    }
+    .ai-modal-save {
+      background: var(--accent); color: #0e0f11; border: none;
+      font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+      padding: 5px 14px; border-radius: var(--radius-sm); cursor: pointer;
+    }
+
+    /* ── AI insights panel ── */
+    #ai-panel { display: none; }
+    .ai-panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .ai-panel-head .sec-title { margin-bottom: 0; }
+    .ai-stamp { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+    .ai-rerun {
+      margin-left: auto; background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      font-family: 'DM Sans', sans-serif; font-size: 11px; padding: 3px 10px;
+      border-radius: var(--radius-sm); cursor: pointer;
+    }
+    .ai-rerun:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+    .ai-key-btn {
+      background: transparent; border: none; color: var(--text-muted);
+      font-size: 13px; cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    .ai-key-btn:hover { color: var(--text); }
+    .ai-sections { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 900px) { .ai-sections { grid-template-columns: 1fr; } }
+    .ai-section { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .ai-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 10px; }
+    .ai-section ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .ai-section li { font-size: 12px; color: var(--text-dim); line-height: 1.55; padding-left: 14px; position: relative; }
+    .ai-section li::before { content: '·'; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+    .ai-section li strong { color: var(--text); font-weight: 600; }
+    .ai-loading-msg { color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 10px; padding: 24px 0; }
+
     /* ── Drop overlay ── */
     #drop-overlay {
       position: fixed; inset: 0; z-index: 500;
@@ -353,10 +420,27 @@
     <div class="header-right">
       <span class="src-indicator" id="src-indicator"></span>
       <button class="reset-btn hidden" id="reset-btn">Reset to files</button>
+      <button class="ai-btn" id="ai-btn">✦ Analyze</button>
       <button class="load-btn" id="load-btn">＋ Load file</button>
       <input type="file" id="file-input" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
     </div>
   </header>
+
+  <!-- AI key modal -->
+  <div id="ai-modal" class="hidden">
+    <div class="ai-modal-card">
+      <div class="ai-modal-title">Claude API Key</div>
+      <div class="ai-modal-sub">
+        Your key is stored only in this browser and never sent anywhere except the Anthropic API.<br>
+        Get one at <a href="https://console.anthropic.com/keys" target="_blank">console.anthropic.com/keys</a>.
+      </div>
+      <input class="ai-key-input" id="ai-key-input" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <div class="ai-modal-actions">
+        <button class="ai-modal-cancel" id="ai-modal-cancel">Cancel</button>
+        <button class="ai-modal-save" id="ai-modal-save">Save &amp; Analyze</button>
+      </div>
+    </div>
+  </div>
 
   <div id="controls">
     <div class="ctrl-group">
@@ -404,6 +488,17 @@
   <main>
 
     <div id="validation-banner" class="hidden"></div>
+
+    <!-- AI insights panel -->
+    <section id="ai-panel">
+      <div class="ai-panel-head">
+        <span class="sec-title">AI Analysis</span>
+        <span class="ai-stamp" id="ai-stamp"></span>
+        <button class="ai-rerun" id="ai-rerun">↺ Re-analyze</button>
+        <button class="ai-key-btn" id="ai-key-btn" title="Change API key">⚙</button>
+      </div>
+      <div id="ai-content"></div>
+    </section>
 
    <!-- ═══ TAB: PIPELINE ═══ -->
    <div id="tab-pipeline">
@@ -1770,6 +1865,160 @@ function setupControls() {
 // ─────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────
+const LS_AI_KEY = 'b2c_dash_ai_key';
+
+const AI_SYSTEM = `You are a performance analyst for SpotMyEnergy, a German B2C energy company selling dynamic electricity tariffs and solar/energy management products. You receive aggregated dashboard data and respond with exactly three sections using this format:
+
+## Marketing
+(2-3 bullet points on campaign efficiency: which to scale, pause, or optimize based on CPL and CAC)
+
+## Sales Process
+(2-3 bullet points on funnel drop-off: where leads are lost and what to prioritize fixing)
+
+## Watch
+(1-2 bullet points on trends or anomalies worth monitoring)
+
+Rules: cite specific numbers from the data, be direct and actionable, no generic advice. If a metric is missing or data is thin, say so briefly.`;
+
+function buildPrompt() {
+  const deals  = filtered();
+  const n      = deals.length;
+  const funnel = funnelCount(deals);
+  const perf   = perfRows();
+  const rate   = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+
+  // Funnel section
+  const funnelText = [
+    `  Neuer Lead → Qualifiziert: ${rate(funnel['Qualifiziert'], funnel['Neuer Lead'])} (${funnel['Qualifiziert']} of ${funnel['Neuer Lead']})`,
+    `  Qualifiziert → Closing:    ${rate(funnel['Closing'], funnel['Qualifiziert'])} (${funnel['Closing']} of ${funnel['Qualifiziert']})`,
+    `  Closing → Closed Won:      ${rate(funnel['Closed Won'], funnel['Closing'])} (${funnel['Closed Won']} of ${funnel['Closing']})`,
+    `  Overall Lead → Won:        ${rate(funnel['Closed Won'], funnel['Neuer Lead'])}`,
+  ].join('\n');
+
+  // Campaign performance
+  const campText = perf.length
+    ? perf.map(r => `  ${dn(r.label)}: spend €${Math.round(r.spend)}, ${r.leads} leads, CPL €${r.leads ? Math.round(r.cpl) : '—'}, ${r.won} won, CAC €${r.won ? Math.round(r.cac) : '—'}, conv ${rate(r.won, r.leads)}`).join('\n')
+    : '  No campaign data for this selection.';
+
+  // Absage reasons
+  const lost = deals.filter(d => d.lost);
+  const reasons = {};
+  lost.forEach(d => { const r = d.absageGrund || 'Kein Grund angegeben'; reasons[r] = (reasons[r] || 0) + 1; });
+  const absageText = Object.entries(reasons).sort((a,b) => b[1]-a[1]).slice(0,6)
+    .map(([r, c]) => `  - ${r}: ${c} (${Math.round(c/lost.length*100)}%)`).join('\n') || '  No lost deals in selection.';
+
+  // Weekly trend (last 6 weeks across all data)
+  let trendText = '';
+  const allWeeks = [...new Set(allDeals.map(d => d.week))].sort().slice(-6);
+  if (allWeeks.length > 1) {
+    trendText = '\nWeekly trend (last 6 weeks, all campaigns):\n';
+    trendText += allWeeks.map(w => {
+      const wDeals = allDeals.filter(d => d.week === w);
+      const wAds   = adsRows.filter(a => a.week === w);
+      const spend  = wAds.reduce((s, a) => s + a.spend, 0);
+      const leads  = wDeals.length;
+      const won    = wDeals.filter(d => d.won).length;
+      const cpl    = leads && spend ? '€' + Math.round(spend / leads) : '—';
+      return `  ${w}: ${leads} leads, CPL ${cpl}, ${won} won`;
+    }).join('\n');
+  }
+
+  const cohortLabel = effectiveCohort() || 'all time';
+  return `Selection: ${cohortLabel} | channel: ${state.channel} | campaigns: ${[...state.campaigns].map(dn).join(', ')}
+
+Funnel (${n} leads):
+${funnelText}
+
+Campaign performance:
+${campText}
+${trendText}
+Absage reasons (${lost.length} total lost):
+${absageText}`;
+}
+
+function renderInsights(text) {
+  const sections = { Marketing: [], 'Sales Process': [], Watch: [] };
+  let current = null;
+  for (const line of text.split('\n')) {
+    const h = line.match(/^##\s+(.+)/);
+    if (h) { current = h[1].trim(); continue; }
+    if (current && sections[current] !== undefined) {
+      const bullet = line.replace(/^[-*•]\s*/, '').trim();
+      if (bullet) sections[current].push(bullet);
+    }
+  }
+  const toHtml = (bullets) => bullets.length
+    ? `<ul>${bullets.map(b => `<li>${b.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</li>`).join('')}</ul>`
+    : '<p style="color:var(--text-muted);font-size:12px">—</p>';
+
+  const icons = { Marketing: '📈', 'Sales Process': '🔧', Watch: '👀' };
+  document.getElementById('ai-content').innerHTML = `<div class="ai-sections">${
+    Object.entries(sections).map(([title, bullets]) => `
+      <div class="ai-section">
+        <div class="ai-section-title">${icons[title]} ${title}</div>
+        ${toHtml(bullets)}
+      </div>`).join('')
+  }</div>`;
+
+  const now = new Date();
+  document.getElementById('ai-stamp').textContent =
+    `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} · ${effectiveCohort() || 'all time'} · ${state.channel}`;
+  document.getElementById('ai-panel').style.display = 'block';
+}
+
+async function runAnalysis(apiKey) {
+  const btn = document.getElementById('ai-btn');
+  btn.disabled = true; btn.textContent = '✦ Analyzing…';
+  document.getElementById('ai-content').innerHTML = `<div class="ai-loading-msg"><div class="spin"></div> Calling Claude…</div>`;
+  document.getElementById('ai-panel').style.display = 'block';
+  document.getElementById('ai-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 700,
+        system: AI_SYSTEM,
+        messages: [{ role: 'user', content: buildPrompt() }],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    renderInsights(data.content[0].text);
+  } catch (e) {
+    document.getElementById('ai-content').innerHTML =
+      `<div class="ai-loading-msg" style="color:#f87171">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '✦ Analyze';
+  }
+}
+
+function openKeyModal(afterSave) {
+  const modal = document.getElementById('ai-modal');
+  const input = document.getElementById('ai-key-input');
+  input.value = localStorage.getItem(LS_AI_KEY) || '';
+  modal.classList.remove('hidden');
+  input.focus();
+  document.getElementById('ai-modal-save').onclick = () => {
+    const key = input.value.trim();
+    if (!key) return;
+    localStorage.setItem(LS_AI_KEY, key);
+    modal.classList.add('hidden');
+    afterSave(key);
+  };
+  document.getElementById('ai-modal-cancel').onclick = () => modal.classList.add('hidden');
+}
+
 const LS_CSV = 'b2c_dash_csv', LS_NAME = 'b2c_dash_csv_name', LS_TIME = 'b2c_dash_csv_time';
 const LS_ADS = 'b2c_dash_ads', LS_ADS_NAME = 'b2c_dash_ads_name', LS_ADS_TIME = 'b2c_dash_ads_time';
 let controlsReady = false;
@@ -2132,6 +2381,18 @@ function readFile(file) {
 function setupDataControls() {
   const fi = document.getElementById('file-input');
   document.getElementById('load-btn').onclick = () => fi.click();
+
+  document.getElementById('ai-btn').onclick = () => {
+    const key = localStorage.getItem(LS_AI_KEY);
+    if (key) runAnalysis(key);
+    else openKeyModal(k => runAnalysis(k));
+  };
+  document.getElementById('ai-rerun').onclick = () => {
+    const key = localStorage.getItem(LS_AI_KEY);
+    if (key) runAnalysis(key);
+    else openKeyModal(k => runAnalysis(k));
+  };
+  document.getElementById('ai-key-btn').onclick = () => openKeyModal(k => runAnalysis(k));
   fi.onchange = e => { readFile(e.target.files[0]); fi.value = ''; };
 
   document.getElementById('reset-btn').onclick = () => {
