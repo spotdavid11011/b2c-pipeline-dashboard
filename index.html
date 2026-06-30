@@ -317,9 +317,9 @@
     <div class="err-sub">Expected columns (either format)</div>
     <div class="err-cols">
       CreateDate <span class="acc">or</span> Date entered "Neuer Lead (B2C)"…<br>
-      Erstgespräch <span class="acc">or</span> Date entered "Erstgespräch durchgeführt (B2C)"…<br>
-      Abschlussgespräch <span class="acc">or</span> Date entered "Abschlussgespräch durchgeführt (B2C)"…<br>
-      Angebot unterschrieben <span class="acc">or</span> Date entered "Angebot unterschrieben (B2C)"…<br>
+      Erstgespräch <span class="acc">or</span> Date entered "Erstgespräch durchgeführt (B2C)"… <span class="acc">or</span> Date entered "Qualifiziert (B2C)"…<br>
+      Abschlussgespräch <span class="acc">or</span> Date entered "Abschlussgespräch durchgeführt (B2C)"… <span class="acc">or</span> Date entered "Closing (B2C)"…<br>
+      Angebot unterschrieben <span class="acc">or</span> Date entered "Angebot unterschrieben (B2C)"… <span class="acc">or</span> Date entered "Closed won (B2C)"…<br>
       Handover <span class="acc">or</span> Date entered "Handover Installation (B2C)"…<br>
       Absage <span class="acc">or</span> Date entered "Absage (B2C)"…<br>
       utm_campaign<br>
@@ -544,8 +544,8 @@ function recordDisplay(label, raw, prefer) {
 }
 const dn = label => DISPLAY[label] || label;
 
-const STAGES = ['Vor Erstgespräch', 'Nach Erstgespräch', 'Nach Abschlussgespräch'];
-const FUNNEL_STEPS = ['Neuer Lead', 'Erstgespräch', 'Abschlussgespräch', 'Closed Won', 'Closed Lost'];
+const STAGES = ['Vor Qualifizierung', 'Nach Qualifizierung', 'Nach Closing'];
+const FUNNEL_STEPS = ['Neuer Lead', 'Qualifiziert', 'Closing', 'Closed Won', 'Closed Lost'];
 
 // ─────────────────────────────────────────────
 // State
@@ -589,9 +589,12 @@ function detectCols(fields) {
   const long = p => fields.find(f => f.startsWith(p)) || null;
   return {
     createDate:  has('CreateDate')             ? 'CreateDate'             : long('Date entered "Neuer Lead (B2C)"'),
-    erst:        has('Erstgespräch')            ? 'Erstgespräch'           : long('Date entered "Erstgespräch durchgeführt (B2C)"'),
-    abschl:      has('Abschlussgespräch')       ? 'Abschlussgespräch'      : long('Date entered "Abschlussgespräch durchgeführt (B2C)"'),
-    signed:      has('Angebot unterschrieben')  ? 'Angebot unterschrieben' : long('Date entered "Angebot unterschrieben (B2C)"'),
+    // old: "Erstgespräch durchgeführt (B2C)" / new: "Qualifiziert (B2C)"
+    erst:        has('Erstgespräch')            ? 'Erstgespräch'           : long('Date entered "Erstgespräch durchgeführt (B2C)"') || long('Date entered "Qualifiziert (B2C)"'),
+    // old: "Abschlussgespräch durchgeführt (B2C)" / new: "Closing (B2C)"
+    abschl:      has('Abschlussgespräch')       ? 'Abschlussgespräch'      : long('Date entered "Abschlussgespräch durchgeführt (B2C)"') || long('Date entered "Closing (B2C)"'),
+    // old: "Angebot unterschrieben (B2C)" / new: "Closed won (B2C)"
+    signed:      has('Angebot unterschrieben')  ? 'Angebot unterschrieben' : long('Date entered "Angebot unterschrieben (B2C)"') || long('Date entered "Closed won (B2C)"'),
     handover:    has('Handover')               ? 'Handover'               : long('Date entered "Handover Installation (B2C)"'),
     absage:      has('Absage')                 ? 'Absage'                 : long('Date entered "Absage (B2C)"'),
     utm:         'utm_campaign',
@@ -701,10 +704,10 @@ function parseDeals(rows, cols) {
     const paid = isPaid(utm);
 
     let absageStage = null;
-    if (lost)  absageStage  = abschl ? 'Nach Abschlussgespräch' : erst ? 'Nach Erstgespräch' : 'Vor Erstgespräch';
+    if (lost)  absageStage  = abschl ? 'Nach Closing' : erst ? 'Nach Qualifizierung' : 'Vor Qualifizierung';
 
     let pendingStage = null;
-    if (!won && !lost) pendingStage = abschl ? 'Nach Abschlussgespräch' : erst ? 'Nach Erstgespräch' : 'Vor Erstgespräch';
+    if (!won && !lost) pendingStage = abschl ? 'Nach Closing' : erst ? 'Nach Qualifizierung' : 'Vor Qualifizierung';
 
     const month = `${createDate.getFullYear()}-${String(createDate.getMonth()+1).padStart(2,'0')}`;
     const week  = toWeekKey(createDate);
@@ -788,8 +791,8 @@ function renderMetrics(deals) {
 
   const cards = [
     { lbl: 'Leads',           val: n,     sub: null },
-    { lbl: 'Erstgespräch',    val: erst,  sub: pct(erst, n) + ' of leads' },
-    { lbl: 'Abschlussgespräch', val: abschl, sub: pct(abschl, n) + ' of leads' },
+    { lbl: 'Qualifiziert',    val: erst,  sub: pct(erst, n) + ' of leads' },
+    { lbl: 'Closing',         val: abschl, sub: pct(abschl, n) + ' of leads' },
     { lbl: 'Closed Won',      val: won,   sub: 'Close rate ' + pct(won, n) },
     { lbl: 'Absagen',         val: lost,  sub: 'Absage rate ' + pct(lost, n) },
     { lbl: 'In Process',      val: inProc, sub: pct(inProc, n) + ' of leads' },
@@ -810,8 +813,8 @@ function renderMetrics(deals) {
 function funnelCount(deals) {
   return {
     'Neuer Lead':        deals.length,
-    'Erstgespräch':      deals.filter(d => d.erst).length,
-    'Abschlussgespräch': deals.filter(d => d.abschl).length,
+    'Qualifiziert':      deals.filter(d => d.erst).length,
+    'Closing':           deals.filter(d => d.abschl).length,
     'Closed Won':        deals.filter(d => d.won).length,
     'Closed Lost':       deals.filter(d => d.lost).length,
   };
@@ -1062,7 +1065,7 @@ function wowMetrics(wk) {
 
 const WOW_ROWS = [
   { lbl: 'Leads',               key: 'n',         pct: false, hib: true  },
-  { lbl: 'Erstgespräch',        key: 'erst',       pct: false, hib: true  },
+  { lbl: 'Qualifiziert',        key: 'erst',       pct: false, hib: true  },
   { lbl: 'Erst rate',           key: 'erstRate',   pct: true,  hib: true  },
   { lbl: 'Closed Won',          key: 'won',        pct: false, hib: true  },
   { lbl: 'Close rate',          key: 'closeRate',  pct: true,  hib: true  },
@@ -1425,7 +1428,7 @@ function renderPerformance() {
   perfChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Cost / Lead', 'Cost / Erstgespräch', 'Cost / Abschlussgespräch', 'Cost / Acquisition'],
+      labels: ['Cost / Lead', 'Cost / Qualifiziert', 'Cost / Closing', 'Cost / Acquisition'],
       datasets: [{ data: [ratio(spend, leads), ratio(spend, erst), ratio(spend, abschl), ratio(spend, won)],
         backgroundColor: [COLORS.K1a, '#60a5fa', '#fb923c', '#f472b6'], borderRadius: 4, borderSkipped: false }],
     },
@@ -1699,7 +1702,7 @@ function validate(results) {
   const simplified = fields.includes('CreateDate');
   checks.push({ level: 'ok', msg: `Format detected: ${simplified ? 'simplified export' : 'raw HubSpot export'} (${fields.length} columns)` });
 
-  const optional = [['Erstgespräch', cols.erst], ['Abschlussgespräch', cols.abschl], ['Signed', cols.signed], ['Handover', cols.handover], ['Absage', cols.absage]];
+  const optional = [['Qualifiziert', cols.erst], ['Closing', cols.abschl], ['Closed Won', cols.signed], ['Handover', cols.handover], ['Absage', cols.absage]];
   const missing  = optional.filter(([, v]) => !v).map(([k]) => k);
   if (missing.length) checks.push({ level: 'warn', msg: `Stage columns not found (treated as empty): ${missing.join(', ')}` });
 
